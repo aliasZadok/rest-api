@@ -81,21 +81,25 @@ router.get('/users', authenticateUser, (req, res) => {
 router.post('/users', asyncHandler(
   async (req, res, next) => {
     const userDetail = req.body;
-    userDetail.password = bcryptjs.hashSync(userDetail.password.toString(), 10);
 
-    const email = await User.findOne({
-      where: {
-        emailAddress: userDetail.emailAddress
-      }
-    });
-
-    if (!email) {
+    if (!Object.keys(userDetail).length) {
       await User.create( userDetail );
-      res.status(201).location('/').end();
     } else {
-      res.status(400).json({ error: 'This Email Id already exists!' });
-    }
+      userDetail.password = bcryptjs.hashSync(userDetail.password);
 
+      const email = await User.findOne({
+        where: {
+          emailAddress: userDetail.emailAddress
+        }
+      });
+
+      if (!email) {
+        await User.create( userDetail );
+        res.status(201).location('/').end();
+      } else {
+        res.status(400).json({ error: 'This Email Id already exists!' });
+      }
+    }
   }
 ));
 
@@ -128,10 +132,10 @@ router.get('/courses', asyncHandler(
 */
 router.post('/courses', authenticateUser, asyncHandler(
   async (req, res, next) => {
-    const courseDetails = req.body;
-    courseDetails.userId = req.currentUser.id;
+    const courseDetail = req.body;
+    courseDetail.userId = req.currentUser.id;
 
-    await Course.create( courseDetails );
+    await Course.create( courseDetail );
     res.status(201).location('/courses').end();
   }
 ));
@@ -169,10 +173,25 @@ router.put('/courses/:id', authenticateUser, asyncHandler(
   async (req, res, next) => {
     const id = req.params.id;
     const course = await Course.findByPk(id);
+    const courseDetail = req.body;
+    const { title, description } = req.body;
+    const errors = [];
 
     if (req.currentUser.id === course.userId) {
-      await course.update(req.body);
-      res.status(204).end();
+      if (!title) {
+        errors.push('Please provide a value for "Title"');
+      }
+      if (!description) {
+        errors.push('Please provide a value for "Description"');
+      }
+
+      if (!errors.length) {
+        await course.update( courseDetail );
+        res.status(204).end();
+      } else {
+        res.status(400).json({ errors })
+      }
+
     } else {
       res.status(403).end();
     }
